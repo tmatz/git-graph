@@ -471,11 +471,11 @@ fn print_paged(graph_lines: &[String], text_lines: &[String]) -> Result<(), Erro
             let input = crossterm::event::read()?;
             if let Event::Key(evt) = input {
                 match evt.code {
-                    KeyCode::Down => {
+                    KeyCode::Down | KeyCode::Char('j') => {
                         clear = true;
                         print_lines = 1;
                     }
-                    KeyCode::Enter | KeyCode::PageDown => {
+                    KeyCode::Enter | KeyCode::PageDown | KeyCode::Char(' ') => {
                         clear = true;
                         print_lines = height - 2;
                     }
