@@ -49,6 +49,8 @@ pub struct Settings {
     pub branches: BranchSettings,
     /// Regex patterns for finding branch names in merge commit summaries
     pub merge_patterns: MergePatterns,
+    ///
+    pub revisions: Vec<String>,
 }
 
 /// Helper for reading BranchSettings, required due to RegEx.

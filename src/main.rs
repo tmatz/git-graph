@@ -1,4 +1,4 @@
-use clap::{crate_version, Arg, Command};
+use clap::{crate_version, Arg, ArgAction, Command};
 use crossterm::cursor::MoveToColumn;
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use crossterm::style::Print;
@@ -207,6 +207,7 @@ fn from_args() -> Result<(), String> {
                 .required(false)
                 .num_args(1),
         )
+        .arg(Arg::new("revisions").action(ArgAction::Set).num_args(0..))
         .subcommand(Command::new("model")
             .about("Prints or permanently sets the branching model for a repository.")
             .arg(
@@ -363,6 +364,12 @@ fn from_args() -> Result<(), String> {
         Some((None, Some(0), Some(8)))
     };
 
+    let revisions = if let Some(revisions_values) = matches.get_many::<String>("revisions") {
+        revisions_values.map(|s| s.to_string()).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
+
     let settings = Settings {
         debug,
         colored,
@@ -374,6 +381,7 @@ fn from_args() -> Result<(), String> {
         branch_order: BranchOrder::ShortestFirst(true),
         branches: BranchSettings::from(model).map_err(|err| err.to_string())?,
         merge_patterns: MergePatterns::default(),
+        revisions,
     };
 
     run(repository, &settings, svg, commit_limit, pager)

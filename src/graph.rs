@@ -2,7 +2,7 @@
 
 use crate::print::colors::to_terminal_color;
 use crate::settings::{BranchOrder, BranchSettings, MergePatterns, Settings};
-use git2::{BranchType, Commit, Error, Oid, Reference, Repository};
+use git2::{BranchType, Commit, Error, Oid, Reference, Repository, RevparseMode};
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::{HashMap, HashSet};
@@ -47,8 +47,58 @@ impl GitGraph {
         walk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
             .map_err(|err| err.message().to_string())?;
 
-        walk.push_glob("*")
-            .map_err(|err| err.message().to_string())?;
+        let mut pushed = false;
+        for rev in settings.revisions.iter() {
+            match rev.chars().nth(0) {
+                Some('^') => {
+                    let rev: String = rev.chars().skip(1).collect();
+                    let rev = repository.revparse_single(rev.as_str())
+                        .map_err(|err| err.message().to_string())?;
+                    walk.hide(rev.id())
+                        .map_err(|err| err.message().to_string())?;
+                },
+                _ => {
+                    let revspec = repository.revparse(rev.as_str())
+                        .map_err(|err| err.message().to_string())?;
+                    let mode = revspec.mode();
+                    let mode = if mode.is_merge_base() { RevparseMode::MERGE_BASE } else { mode };
+                    match (mode, revspec.from(), revspec.to()) {
+                        (RevparseMode::SINGLE, Some(from), None) => {
+                            pushed = true;
+                            walk.push(from.id())
+                            .map_err(|err| err.message().to_string())?;
+                        },
+                        (RevparseMode::RANGE ,Some(from), Some(to)) => {
+                            pushed = true;
+                            walk.push(to.id())
+                                .map_err(|err| err.message().to_string())?;
+                            walk.hide(from.id())
+                                .map_err(|err| err.message().to_string())?;
+                        },
+                        (RevparseMode::MERGE_BASE, Some(from), Some(to)) => {
+                            pushed = true;
+                            let bases = repository.merge_bases(from.id(), to.id())
+                                .map_err(|err| err.message().to_string())?;
+                            walk.push(to.id())
+                                .map_err(|err| err.message().to_string())?;
+                            walk.push(from.id())
+                                .map_err(|err| err.message().to_string())?;
+                            for base in bases.iter() {
+                                walk.hide(*base)
+                                    .map_err(|err| err.message().to_string())?;
+                            }
+                        },
+                        _ => return Err("Error: unexpected revspec".to_string())
+                    }
+                }
+            }
+
+        }
+
+        if !pushed {
+            walk.push_glob("*")
+                .map_err(|err| err.message().to_string())?;
+        }
 
         if repository.is_shallow() {
             return Err("ERROR: git-graph does not support shallow clones due to a missing feature in the underlying libgit2 library.".to_string());
