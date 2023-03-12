@@ -42,7 +42,7 @@ pub fn print_unicode(graph: &GitGraph, settings: &Settings) -> Result<UnicodeGra
         .iter()
         .map(|b| b.visual.column.unwrap_or(0))
         .max()
-        .unwrap()
+        .unwrap_or(0)
         + 1;
 
     let head_idx = graph.indices.get(&graph.head.oid);
